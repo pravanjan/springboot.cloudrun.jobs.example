@@ -1,7 +1,9 @@
 package com.example.springboot.cloudrun.jobs.migration;
 
 import com.example.springboot.cloudrun.jobs.model.NotificationSettings;
+import com.example.springboot.cloudrun.jobs.service.ApiCaller;
 import com.example.springboot.cloudrun.jobs.service.MigrationService;
+import com.example.springboot.cloudrun.jobs.service.data.ApiResponse;
 import com.example.springboot.cloudrun.jobs.utils.ADCSetup;
 import com.example.springboot.cloudrun.jobs.utils.WriteDataTocsv;
 import com.google.api.core.ApiFuture;
@@ -23,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 @AllArgsConstructor
 public class Migration {
     private ADCSetup adcSetup;
+    private final MigrationService migrationService;
 
 
 
@@ -94,9 +97,11 @@ public class Migration {
             // Update the document data if needed
             // For example, adding a new field
             Map<String, Object> updatedData = document.getData();
-            NotificationSettings settings = new MigrationService().convertToNotificationSettings(document.getId(), updatedData);
+            NotificationSettings settings = migrationService.convertToNotificationSettings(document.getId(), updatedData);
             DocumentReference documentReference = targetCollection.document(document.getId());
             batch.set(documentReference, settings);
+            //Calling migration B to store activation data
+            migrationService.convertToAccountInformation(updatedData);
 
         }
         batch.commit();
@@ -129,7 +134,7 @@ public class Migration {
     public static  void run() throws ExecutionException, InterruptedException {
 
         Migration migration = new Migration(
-                new ADCSetup("your projectId"));
+                new ADCSetup("your projectId"), new MigrationService(new ApiCaller(new ApiResponse())));
         CollectionReference targetCollection = migration.getdb().collection("RESULT");
 
         migration.process(migration, targetCollection,  2);
